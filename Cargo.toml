@@ -14,3 +14,7 @@ structopt = "0.3.21"
 [dependencies.canadian_mortgage]
 git = "ssh://git@github.com/mlbright/canadian-mortgage"
 branch = "main"
+
+[dependencies.toronto_land_transfer_tax]
+git = "ssh://git@github.com/mlbright/toronto-land-transfer-tax"
+branch = "main"
