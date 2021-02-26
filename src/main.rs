@@ -3,60 +3,57 @@ use rust_decimal_macros::*;
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "house-buyer")]
+#[structopt(name = "home-buyer")]
 struct CommandLineOptions {
     #[structopt(short, long)]
-    purchase: Decimal,
-
-    #[structopt(short, long)]
-    sale: Decimal,
-
-    #[structopt(short, long, default_value = "5")]
-    real_estate_agent_commission: Decimal,
+    amortization_period: u64,
 
     #[structopt(short, long, default_value = "13")]
     hst: Decimal,
 
+    #[structopt(short, long)]
+    interest_rate: Decimal,
+
     #[structopt(long)]
     lawyer_fees: Decimal,
-
-    #[structopt(short, long)]
-    outstanding_mortgage: Decimal,
 
     #[structopt(long)]
     line_of_credit: Decimal,
 
-    #[structopt(short, long)]
-    mortgage_principal: Option<Decimal>,
-
-    #[structopt(short, long)]
-    interest_rate: Decimal,
-
-    #[structopt(short, long)]
-    amortization_period: u64,
-
     #[structopt(long)]
     mortgage_penalty: Option<Decimal>,
+
+    #[structopt(short, long)]
+    outstanding_mortgage: Decimal,
+
+    #[structopt(short, long)]
+    purchase: Decimal,
+
+    #[structopt(short, long, default_value = "5")]
+    real_estate_commission: Decimal,
+
+    #[structopt(short, long)]
+    sale: Decimal,
 }
 
 fn main() {
     let command_line_options = CommandLineOptions::from_args();
 
-    let penalty = command_line_options.mortgage_penalty.unwrap_or(dec!(0));
+    let real_estate_commission =
+        command_line_options.sale * (command_line_options.real_estate_commission / dec!(100));
+    let real_estate_commission_tax =
+        real_estate_commission * (command_line_options.hst / dec!(100));
 
     let outgoing = command_line_options.purchase
         + toronto_land_transfer_tax::tax(command_line_options.purchase).unwrap()
-        + (command_line_options.sale
-            * (command_line_options.real_estate_agent_commission / dec!(100)))
-        + (command_line_options.sale * (command_line_options.hst / dec!(100)))
+        + real_estate_commission
+        + real_estate_commission_tax
         + command_line_options.lawyer_fees
         + command_line_options.line_of_credit
         + command_line_options.outstanding_mortgage
-        + penalty;
+        + command_line_options.mortgage_penalty.unwrap_or(dec!(0));
 
-    let incoming = command_line_options.sale;
-
-    let required_mortgage = outgoing - incoming;
+    let required_mortgage = outgoing - command_line_options.sale;
 
     let mortgage = canadian_mortgage::CanadianMortgage::new(
         command_line_options.interest_rate,
