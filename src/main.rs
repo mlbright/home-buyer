@@ -1,6 +1,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::*;
 use structopt::StructOpt;
+use tera::{Context, Tera};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "home-buyer")]
@@ -36,7 +37,7 @@ struct CommandLineOptions {
     sale: Decimal,
 }
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let command_line_options = CommandLineOptions::from_args();
 
     let real_estate_commission =
@@ -44,16 +45,17 @@ fn main() {
     let real_estate_commission_tax =
         real_estate_commission * (command_line_options.hst / dec!(100));
 
-    let outgoing = command_line_options.purchase
-        + toronto_land_transfer_tax::tax(command_line_options.purchase).unwrap()
+    let land_transfer_tax = toronto_land_transfer_tax::tax(command_line_options.purchase)?;
+
+    let outstanding_principal = command_line_options.purchase
+        + land_transfer_tax
         + real_estate_commission
         + real_estate_commission_tax
         + command_line_options.lawyer_fees
         + command_line_options.line_of_credit.unwrap_or(dec!(0))
         + command_line_options.outstanding_mortgage
-        + command_line_options.mortgage_penalty.unwrap_or(dec!(0));
-
-    let required_mortgage = outgoing - command_line_options.sale;
+        + command_line_options.mortgage_penalty.unwrap_or(dec!(0))
+        - command_line_options.sale;
 
     let mortgage = canadian_mortgage::CanadianMortgage::new(
         command_line_options.interest_rate,
@@ -62,8 +64,78 @@ fn main() {
     )
     .unwrap();
 
-    println!(
-        "mortgage payment: {}",
-        mortgage.payment(required_mortgage).unwrap()
+    let monthly_payment = mortgage.payment(outstanding_principal)?;
+
+    let tera = Tera::new("templates/**/*.tmpl")?;
+
+    // Using the tera Context struct
+    let mut context = Context::new();
+    context.insert(
+        "purchase",
+        &command_line_options
+            .purchase
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
     );
+    context.insert(
+        "land_transfer_tax",
+        &land_transfer_tax.round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "commission",
+        &real_estate_commission
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "commission_tax",
+        &real_estate_commission_tax
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "lawyer_fees",
+        &command_line_options
+            .lawyer_fees
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "outstanding_mortgage",
+        &command_line_options
+            .outstanding_mortgage
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "mortgage_penalty",
+        &command_line_options
+            .mortgage_penalty
+            .unwrap_or(dec!(0))
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "sale",
+        &command_line_options
+            .sale
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "interest_rate",
+        &command_line_options
+            .interest_rate
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "amortization_period",
+        &command_line_options.amortization_period,
+    );
+    context.insert(
+        "principal",
+        &outstanding_principal
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "payment",
+        &monthly_payment.round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+
+    println!("{}", tera.render("report.tmpl", &context)?);
+
+    Ok(())
 }
