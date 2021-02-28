@@ -18,7 +18,7 @@ struct CommandLineOptions {
     lawyer_fees: Decimal,
 
     #[structopt(long)]
-    line_of_credit: Decimal,
+    line_of_credit: Option<Decimal>,
 
     #[structopt(long)]
     mortgage_penalty: Option<Decimal>,
@@ -49,7 +49,7 @@ fn main() {
         + real_estate_commission
         + real_estate_commission_tax
         + command_line_options.lawyer_fees
-        + command_line_options.line_of_credit
+        + command_line_options.line_of_credit.unwrap_or(dec!(0))
         + command_line_options.outstanding_mortgage
         + command_line_options.mortgage_penalty.unwrap_or(dec!(0));
 
