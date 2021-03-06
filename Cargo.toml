@@ -1,5 +1,5 @@
 [package]
-name = "house-buyer"
+name = "home-buyer"
 version = "0.1.0"
 authors = ["mlbright"]
 edition = "2018"

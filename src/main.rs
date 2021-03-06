@@ -16,7 +16,13 @@ struct CommandLineOptions {
     interest_rate: Decimal,
 
     #[structopt(long)]
-    lawyer_fees: Decimal,
+    purchase_lawyer_fee: Decimal,
+
+    #[structopt(long)]
+    sale_lawyer_fee: Decimal,
+
+    #[structopt(long)]
+    title_insurance: Decimal,
 
     #[structopt(long)]
     line_of_credit: Option<Decimal>,
@@ -51,7 +57,9 @@ fn main() -> anyhow::Result<()> {
         + land_transfer_tax
         + real_estate_commission
         + real_estate_commission_tax
-        + command_line_options.lawyer_fees
+        + command_line_options.purchase_lawyer_fee
+        + command_line_options.sale_lawyer_fee
+        + command_line_options.title_insurance
         + command_line_options.line_of_credit.unwrap_or(dec!(0))
         + command_line_options.outstanding_mortgage
         + command_line_options.mortgage_penalty.unwrap_or(dec!(0))
@@ -66,7 +74,8 @@ fn main() -> anyhow::Result<()> {
 
     let monthly_payment = mortgage.payment(outstanding_principal)?;
 
-    let tera = Tera::new("templates/**/*.tmpl")?;
+    let mut tera = Tera::default();
+    tera.add_raw_template("report", include_str!("templates/report.tmpl"))?;
 
     // Using the tera Context struct
     let mut context = Context::new();
@@ -91,9 +100,21 @@ fn main() -> anyhow::Result<()> {
             .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
     );
     context.insert(
-        "lawyer_fees",
+        "purchase_lawyer_fee",
         &command_line_options
-            .lawyer_fees
+            .purchase_lawyer_fee
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "sale_lawyer_fee",
+        &command_line_options
+            .sale_lawyer_fee
+            .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
+    );
+    context.insert(
+        "title_insurance",
+        &command_line_options
+            .title_insurance
             .round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
     );
     context.insert(
@@ -135,7 +156,7 @@ fn main() -> anyhow::Result<()> {
         &monthly_payment.round_dp_with_strategy(2, rust_decimal::RoundingStrategy::RoundHalfUp),
     );
 
-    println!("{}", tera.render("report.tmpl", &context)?);
+    println!("{}", tera.render("report", &context)?);
 
     Ok(())
 }
